@@ -1,0 +1,6 @@
+<SeekBar android:id="@+id/notificationSeekBar"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:max="100"
+    android:progress="0"
+    xmlns:android="http://schemas.android.com/apk/res/android" />

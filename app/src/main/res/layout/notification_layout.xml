@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/white"
+    android:padding="10dp">
+
+
+    <ImageView
+        android:id="@+id/notificationAlbumArt"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:scaleType="centerCrop"
+        android:layout_alignParentStart="true"
+        android:layout_centerVertical="true"
+        android:layout_marginEnd="10dp" />
+
+    <!-- Title -->
+    <TextView
+        android:id="@+id/notificationTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textColor="@android:color/white"
+        android:textSize="14sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:layout_toEndOf="@id/notificationAlbumArt"
+        android:layout_alignParentTop="true"
+        android:layout_marginBottom="2dp"
+        android:layout_marginEnd="40dp"
+        android:layout_alignParentEnd="true" />
+
+    <!-- Artist -->
+    <TextView
+        android:id="@+id/notificationArtist"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textColor="@android:color/darker_gray"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:layout_toEndOf="@id/notificationAlbumArt"
+        android:layout_below="@id/notificationTitle"
+        android:layout_marginEnd="40dp"
+        android:layout_alignParentEnd="true" />
+
+    <!-- Play/Pause Button -->
+    <ImageView
+        android:id="@+id/notificationPlayPause"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:src="@drawable/ic_play" />
+
+    <!-- Seek Bar -->
+    <ProgressBar
+        android:id="@+id/notificationSeekBar"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="100"
+        android:progress="0"
+        android:progressDrawable="@android:drawable/progress_horizontal"
+        android:layout_below="@id/notificationArtist"
+        android:layout_toEndOf="@id/notificationAlbumArt"
+        android:layout_marginTop="4dp"
+        android:layout_alignStart="@id/notificationAlbumArt"
+        android:layout_alignEnd="@id/notificationPlayPause" />
+
+</RelativeLayout>
