@@ -3,28 +3,30 @@ package com.example.music_player.util
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+
 import android.net.Uri
-import android.util.Log
+import com.example.music_player.model.Data
 
 object MediaPlayerManager {
 
     private var mediaPlayer: MediaPlayer? = null
     private var currentTrackUri: Uri? = null
+
     private var _isPlaying: Boolean = false
-    val isPlaying: Boolean
+    var isPlaying: Boolean = false
         get() = _isPlaying
 
     private var lastPosition: Int = 0
     private var isLooping: Boolean = false
-    private var playbackStateListener: PlaybackStateListener? = null
+    private val playbackStateListeners = mutableListOf<PlaybackStateListener>()
     private var completionListener: CompletionListener? = null
 
-    fun setPlaybackStateListener(listener: PlaybackStateListener) {
-        playbackStateListener = listener
+    fun addPlaybackStateListener(listener: PlaybackStateListener) {
+        playbackStateListeners.add(listener)
     }
 
-    fun removePlaybackStateListener() {
-        playbackStateListener = null
+    fun removePlaybackStateListener(listener: PlaybackStateListener) {
+        playbackStateListeners.remove(listener)
     }
 
     fun setCompletionListener(listener: CompletionListener) {
@@ -39,7 +41,8 @@ object MediaPlayerManager {
         if (currentTrackUri == trackUri && mediaPlayer != null) {
             mediaPlayer?.seekTo(lastPosition) // Resume from last position
             mediaPlayer?.start()
-            setIsPlaying(true)
+            _isPlaying = true // Update custom state
+            notifyPlaybackStateChanged(true) // Notify listeners
             return
         }
 
@@ -56,10 +59,12 @@ object MediaPlayerManager {
             prepareAsync()
             setOnPreparedListener {
                 start()
-                setIsPlaying(true)
+                _isPlaying = true // Update custom state
+                notifyPlaybackStateChanged(true) // Notify listeners
             }
             setOnCompletionListener {
-                setIsPlaying(false)
+                _isPlaying = false // Update custom state
+                notifyPlaybackStateChanged(false) // Notify listeners
                 completionListener?.onTrackCompleted()
             }
         }
@@ -67,22 +72,29 @@ object MediaPlayerManager {
         currentTrackUri = trackUri
     }
 
+
     fun pauseTrack() {
         mediaPlayer?.let {
             if (it.isPlaying) {
                 lastPosition = it.currentPosition
                 it.pause()
-                setIsPlaying(false)
+                _isPlaying = false // Update custom state
+                notifyPlaybackStateChanged(false) // Notify listeners
             }
         }
     }
 
     fun stopTrack() {
-        mediaPlayer?.release()
+        mediaPlayer?.let {
+            if (it.isPlaying) {
+                it.stop()
+            }
+            it.release()
+        }
         mediaPlayer = null
-        lastPosition = 0
-        setIsPlaying(false)
         currentTrackUri = null
+        _isPlaying = false // Update custom state
+        notifyPlaybackStateChanged(false) // Notify listeners
     }
 
     fun getCurrentPosition(): Int? = mediaPlayer?.currentPosition
@@ -96,22 +108,21 @@ object MediaPlayerManager {
         isLooping = loop
         mediaPlayer?.isLooping = loop
     }
+
     fun resumeTrack() {
         mediaPlayer?.let {
             if (!it.isPlaying) {
                 it.start()
+                _isPlaying = true // Update custom state
+                notifyPlaybackStateChanged(true) // Notify listeners
             }
         }
     }
 
+    fun getMediaPlayer(): MediaPlayer? = mediaPlayer
 
-    private fun setIsPlaying(value: Boolean) {
-        _isPlaying = value
-        playbackStateListener?.onPlaybackStateChanged(value)
-    }
-
-    fun getMediaPlayer(): MediaPlayer? {
-        return mediaPlayer
+    private fun notifyPlaybackStateChanged(isPlaying: Boolean) {
+        playbackStateListeners.forEach { it.onPlaybackStateChanged(isPlaying) }
     }
 
     interface PlaybackStateListener {

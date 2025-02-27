@@ -1,5 +1,6 @@
 package com.example.music_player.ui
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -12,6 +13,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import com.bumptech.glide.Glide
 import com.example.music_player.R
+import com.example.music_player.Services.MusicService
 import com.example.music_player.databinding.FragmentSongDetailBinding
 import com.example.music_player.model.Data
 import com.example.music_player.util.MediaPlayerManager
@@ -23,15 +25,6 @@ class SongDetailFragment : Fragment() {
     private lateinit var playbackViewModel: PlaybackViewModel
     private val handler = Handler(Looper.getMainLooper())
 
-    private val playbackStateListener = object : MediaPlayerManager.PlaybackStateListener {
-        override fun onPlaybackStateChanged(isPlaying: Boolean) {
-            if (!isAdded) return
-            requireActivity().runOnUiThread {
-                updatePlayPauseIcon()
-            }
-        }
-    }
-
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -39,11 +32,12 @@ class SongDetailFragment : Fragment() {
         binding = FragmentSongDetailBinding.inflate(inflater, container, false)
         track = arguments?.getParcelable("track")
 
+        playbackViewModel = ViewModelProvider(requireActivity())[PlaybackViewModel::class.java]
+
         track?.let {
             binding.songTitle.text = it.title
             binding.artistName.text = it.artist.name
             Glide.with(requireContext()).load(it.album.cover_medium).into(binding.albumCover)
-
             updatePlayPauseIcon()
         }
 
@@ -51,30 +45,33 @@ class SongDetailFragment : Fragment() {
             togglePlayback()
         }
 
-        MediaPlayerManager.setPlaybackStateListener(playbackStateListener)
-        playbackViewModel = ViewModelProvider(requireActivity())[PlaybackViewModel::class.java]
-
         playbackViewModel.isPlaying.observe(viewLifecycleOwner) { isPlaying ->
             binding.playPauseButton.setImageResource(
                 if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
             )
         }
+//        binding.nextButton.setOnClickListener {
+//            playbackViewModel.nextTrack(requireContext())
+//        }
 
         setupSeekBar()
         return binding.root
     }
 
     private fun togglePlayback() {
-        if (MediaPlayerManager.isPlaying) {
-            MediaPlayerManager.pauseTrack()
-        } else {
-            track?.let {
-                MediaPlayerManager.playTrack(requireContext(), Uri.parse(it.preview))
+        track?.let { track ->
+            val intent = Intent(requireContext(), MusicService::class.java).apply {
+                action =
+                    if (MediaPlayerManager.isPlaying) MusicService.ACTION_PAUSE else MusicService.ACTION_PLAY
+                putExtra("TRACK_DATA", track)
+            }
+            requireContext().startService(intent)
+            if (!MediaPlayerManager.isPlaying) {
                 startSeekBarUpdater()
             }
         }
-        playbackViewModel.setPlayingState(MediaPlayerManager.isPlaying)
     }
+
 
     private fun setupSeekBar() {
         binding.seekBar.max = 100
@@ -82,9 +79,9 @@ class SongDetailFragment : Fragment() {
         binding.seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
-                    val newPosition = (progress / 100f) * (MediaPlayerManager.getDuration() ?: 0)
+                    val duration = MediaPlayerManager.getDuration() ?: 0
+                    val newPosition = (progress.toFloat() / 100) * duration
                     MediaPlayerManager.seekTo(newPosition.toInt())
-                    updateSeekBar(newPosition.toInt())
                 }
             }
 
@@ -99,19 +96,15 @@ class SongDetailFragment : Fragment() {
         handler.post(object : Runnable {
             override fun run() {
                 val currentPosition = MediaPlayerManager.getCurrentPosition() ?: 0
-                updateSeekBar(currentPosition)
+                val duration = MediaPlayerManager.getDuration() ?: 0
+                if (duration > 0) {
+                    binding.seekBar.progress = (currentPosition * 100 / duration).coerceIn(0, 100)
+                }
+                binding.startTime.text = formatTime(currentPosition)
+                binding.totalTime.text = formatTime(duration)
                 handler.postDelayed(this, 1000)
             }
         })
-    }
-
-    private fun updateSeekBar(position: Int) {
-        val duration = MediaPlayerManager.getDuration() ?: 0
-        if (duration > 0) {
-            binding.seekBar.progress = (position * 100) / duration
-        }
-        binding.startTime.text = formatTime(position)
-        binding.totalTime.text = formatTime(duration)
     }
 
     private fun formatTime(millis: Int): String {
@@ -121,20 +114,13 @@ class SongDetailFragment : Fragment() {
     }
 
     private fun updatePlayPauseIcon() {
-        val isPlaying = MediaPlayerManager.isPlaying
         binding.playPauseButton.setImageResource(
-            if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
+            if (MediaPlayerManager.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
         )
-        requireActivity().findViewById<View>(R.id.playPauseButton)?.let { playButton ->
-            (playButton as? android.widget.ImageButton)?.setImageResource(
-                if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
-            )
-        }
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        MediaPlayerManager.removePlaybackStateListener()
         handler.removeCallbacksAndMessages(null)
     }
 }

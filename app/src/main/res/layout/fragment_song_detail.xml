@@ -143,16 +143,17 @@ android:layout_weight="1"
             app:layout_constraintTop_toBottomOf="@+id/buttons_lay"
      app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"  />
+
         <ImageView
-            android:id="@+id/rotate"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
+            android:id="@+id/rotatebtn"
+            android:layout_width="11dp"
+            android:layout_height="21dp"
             android:contentDescription="Back"
             android:padding="5dp"
             android:src="@drawable/baseline_repeat_24"
-            app:layout_constraintTop_toBottomOf="@+id/buttons_lay"
-           app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"  />
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/buttons_lay" />
 
 <!--        <androidx.constraintlayout.widget.Guideline-->
 <!--            android:id="@+id/gdLeft"-->

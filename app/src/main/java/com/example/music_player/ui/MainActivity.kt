@@ -1,6 +1,9 @@
 package com.example.music_player.ui
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
 import android.net.Uri
@@ -8,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -33,13 +37,26 @@ class MainActivity : AppCompatActivity() {
     private lateinit var viewModel: MusicViewModel
     private lateinit var adapter: TrackAdapter
     private var mediaPlayer: MediaPlayer? = null
-    private var isPlaying = false
     private var currentTrack: Data? = null
     private lateinit var artistviewModel: ArtistViewModel
     private lateinit var selectedImageItem: ArtistName
+    private var trackList: List<Data> = emptyList()
+    private var currentIndex: Int = 0
 
+
+    private val playbackStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val isPlaying = intent?.getBooleanExtra("isPlaying", false) ?: false
+            playbackViewModel.setPlayingState(isPlaying)
+        }
+    }
+
+
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        playbackViewModel = ViewModelProvider(this)[PlaybackViewModel::class.java]
 
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
         viewModel = ViewModelProvider(this)[MusicViewModel::class.java]
@@ -50,10 +67,13 @@ class MainActivity : AppCompatActivity() {
         MediaPlayerManager.setCompletionListener(object : MediaPlayerManager.CompletionListener {
             override fun onTrackCompleted() {
                 runOnUiThread {
-                    binding.playPauseButton.setImageResource(R.drawable.ic_play)
+                    binding.playPauseButton.setImageResource(R.drawable.ic_pause)
                 }
             }
         })
+
+        val filter = IntentFilter("MUSIC_PLAYBACK_STATE")
+        registerReceiver(playbackStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
 
         adapter = TrackAdapter(emptyList()) { track -> onTrackClicked(track) }
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
@@ -78,8 +98,11 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
+
         viewModel.tracks.observe(this) { myData ->
-            myData?.let { adapter.updateData(it.data) }
+
+            myData?.let { adapter.updateData(it.data)
+                trackList = it.data}
         }
 
         viewModel.fetchTracks("Eminem")
@@ -91,15 +114,6 @@ class MainActivity : AppCompatActivity() {
         binding.bottomMusicBar.setOnClickListener {
             openSongDetailFragment()
         }
-
-        MediaPlayerManager.setPlaybackStateListener(object :
-            MediaPlayerManager.PlaybackStateListener {
-            override fun onPlaybackStateChanged(isPlaying: Boolean) {
-                runOnUiThread {
-                    binding.playPauseButton.setImageResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play)
-                }
-            }
-        })
     }
 
     private fun requestNotificationPermission() {
@@ -129,6 +143,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onTrackClicked(track: Data) {
+        MediaPlayerManager.stopTrack()
         currentTrack = track
         binding.bottomMusicBar.visibility = View.VISIBLE
         binding.songTitle.text = track.title
@@ -139,57 +154,39 @@ class MainActivity : AppCompatActivity() {
             putExtra("TRACK_DATA", track)
         }
         startService(intent)
-
-        binding.playPauseButton.setImageResource(R.drawable.ic_pause)
     }
 
-    private fun stopCurrentTrack() {
-        mediaPlayer?.let {
-            if (it.isPlaying) {
-                it.stop()
-                it.release()
-            }
-        }
-        mediaPlayer = null
-    }
-
-//    private fun togglePlayback() {
-//        if (MediaPlayerManager.isPlaying) {
-//            MediaPlayerManager.pauseTrack()
-//        } else {
-//            currentTrack?.let {
-//                MediaPlayerManager.playTrack(this, Uri.parse(it.preview))
-//            }
+//    private fun onTrackClicked(track: Data) {
+//        MediaPlayerManager.stopTrack()
+//        currentTrack = track
+//        currentIndex = trackList.indexOf(track) // Update current index
+//
+//        binding.bottomMusicBar.visibility = View.VISIBLE
+//        binding.songTitle.text = track.title
+//        Glide.with(this).load(track.album.cover_medium).into(binding.songImage)
+//
+//        val intent = Intent(this, MusicService::class.java).apply {
+//            action = MusicService.ACTION_PLAY
+//            putExtra("TRACK_DATA", track)
 //        }
-//        playbackViewModel.setPlayingState(MediaPlayerManager.isPlaying)
+//        startService(intent)
 //    }
+
+
+
+
+
+
+
+
     private fun togglePlayback() {
-        if (MediaPlayerManager.isPlaying) {
-            MediaPlayerManager.pauseTrack()
-        } else {
-            currentTrack?.let {
-                MediaPlayerManager.playTrack(this, Uri.parse(it.preview))
-            }
-        }
-        playbackViewModel.setPlayingState(MediaPlayerManager.isPlaying)
-        updateNotification()
-    }
-
-
-        private fun updateNotification() {
+        currentTrack?.let { track ->
             val intent = Intent(this, MusicService::class.java).apply {
-                action = if (MediaPlayerManager.isPlaying) MusicService.ACTION_PLAY else MusicService.ACTION_PAUSE
+                action = if (MediaPlayerManager.isPlaying) MusicService.ACTION_PAUSE else MusicService.ACTION_PLAY
+                putExtra("TRACK_DATA", track)
             }
             startService(intent)
         }
-
-
-
-
-    private fun updatePlayPauseIcon() {
-        binding.playPauseButton.setImageResource(
-            if (MediaPlayerManager.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
-        )
     }
 
     private fun openSongDetailFragment() {
@@ -215,9 +212,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        stopCurrentTrack()
+        unregisterReceiver(playbackStateReceiver)
         MediaPlayerManager.removeCompletionListener()
-        MediaPlayerManager.removePlaybackStateListener()
     }
 
     override fun onBackPressed() {
